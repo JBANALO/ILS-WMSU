@@ -1,101 +1,242 @@
-import React from "react";
-import StudentTopbar from "../../layouts/student/StudentTopbar";
-import GradesTable from "../../components/student/GradesTable";
-import AttendanceCalendar from "../../components/student/AttendanceCalendar";
+import React, { useState } from 'react';
+import { Download, Calendar, BookOpen } from 'lucide-react';
 
-export default function StudentDashboard() {
-  const student = {
-    name: "Juan M. Dela Cruz",
-    gradeLevel: "Grade 6",
-    section: "Honesty",
-    age: 12,
-    sex: "Male",
-    lrn: "123456789012",
-    profilePic: "/student-avatar.jpg", 
+const StudentPortal = () => {
+  const [activeTab, setActiveTab] = useState('grades');
+  
+
+  const gradesData = [
+    { subject: 'Mathematics', teacher: 'Ms. Santos', grade: '92', remarks: 'Passed' },
+    { subject: 'Science', teacher: 'Mr. Cruz', grade: '88', remarks: 'Passed' },
+    { subject: 'English', teacher: 'Mrs. Reyes', grade: '90', remarks: 'Passed' },
+    { subject: 'Filipino', teacher: 'Ms. Garcia', grade: '95', remarks: 'Passed' },
+    { subject: 'MAPEH', teacher: 'Mr. Torres', grade: '91', remarks: 'Passed' },
+  ];
+
+  const attendanceData = [
+    { date: 'Nov 18, 2024', day: 'Monday', status: 'Present' },
+    { date: 'Nov 19, 2024', day: 'Tuesday', status: 'Present' },
+    { date: 'Nov 20, 2024', day: 'Wednesday', status: 'Absent' },
+    { date: 'Nov 21, 2024', day: 'Thursday', status: 'Present' },
+    { date: 'Nov 22, 2024', day: 'Friday', status: 'Present' },
+  ];
+
+  const scheduleData = [
+    { time: '8:00 AM - 9:00 AM', subject: 'Mathematics', teacher: 'Ms. Santos' },
+    { time: '9:00 AM - 10:00 AM', subject: 'Science', teacher: 'Mr. Cruz' },
+    { time: '10:00 AM - 11:00 AM', subject: 'English', teacher: 'Mrs. Reyes' },
+    { time: '11:00 AM - 12:00 PM', subject: 'Filipino', teacher: 'Ms. Garcia' },
+    { time: '1:00 PM - 2:00 PM', subject: 'MAPEH', teacher: 'Mr. Torres' },
+  ];
+
+  const downloadGrades = () => {
+    const csvContent = "Subject,Teacher,Grade,Remarks\n" + 
+      gradesData.map(row => `${row.subject},${row.teacher},${row.grade},${row.remarks}`).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'grades_grade3_wisdom.csv';
+    a.click();
+  };
+
+  const downloadAttendance = () => {
+    const csvContent = "Date,Day,Status\n" + 
+      attendanceData.map(row => `${row.date},${row.day},${row.status}`).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'attendance_grade3_wisdom.csv';
+    a.click();
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 font-montserrat">
-      <StudentTopbar studentName={student.name} />
-      <main className="pt-20 px-6 lg:px-10 pb-12 max-w-7xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-10 border border-gray-200 max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center gap-10">
-            <div className="relative">
-              <img
-                src={student.profilePic}
-                alt="Student Profile"
-                className="w-45 h-45 rounded-full object-cover border-8 border-red-800 shadow-2xl"
-                onError={(e) => {
-                  e.target.src = "https://via.placeholder.com/200/4B5565/FFFFFF?text=Student";
-                }}
-              />
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="bg-gradient-to-r from-red-900 to-red-800 text-white rounded-lg p-6 mb-6 shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 bg-white rounded-lg flex items-center justify-center">
+              <BookOpen className="w-12 h-12 text-red-900" />
             </div>
+            <div>
+              <h2 className="text-2xl font-bold">Grade 3 - Wisdom</h2>
+              <p className="text-red-100">Student Name: Juan Dela Cruz</p>
+              <p className="text-red-100">Student ID: 2024-00123</p>
+            </div>
+          </div>
+        </div>
 
-            <div className="text-center md:text-left">
-              <h1 className="text-4xl font-bold text-gray-800 mb-3">
-                {student.name}
-              </h1>
-                <div className="space-y-2 text-lg font-medium text-gray-700">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-10">
-                    <div className="flex items-center">
-                      <span className="text-gray-600 w-16">Grade:</span>
-                      <span className="text-red-800 font-bold text-xl">
-                        {student.gradeLevel}
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-gray-600 w-20">Section:</span>
-                      <span className="text-red-800 font-bold text-xl">
-                        {student.section}
-                      </span>
-                    </div>
-                  </div>
+        <div className="flex gap-2 mb-6 bg-white rounded-lg p-2 shadow-sm">
+          <button
+            onClick={() => setActiveTab('grades')}
+            className={`flex-1 py-3 px-4 rounded-md font-medium transition ${
+              activeTab === 'grades'
+                ? 'bg-red-900 text-white'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <BookOpen className="w-5 h-5 inline mr-2" />
+            Grades
+          </button>
+          <button
+            onClick={() => setActiveTab('attendance')}
+            className={`flex-1 py-3 px-4 rounded-md font-medium transition ${
+              activeTab === 'attendance'
+                ? 'bg-red-900 text-white'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Calendar className="w-5 h-5 inline mr-2" />
+            Attendance
+          </button>
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`flex-1 py-3 px-4 rounded-md font-medium transition ${
+              activeTab === 'schedule'
+                ? 'bg-red-900 text-white'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Calendar className="w-5 h-5 inline mr-2" />
+            Schedule
+          </button>
+        </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-16">
-                    <div className="flex items-center">
-                      <span className="text-gray-600 w-12">Age:</span>
-                      <span className="text-xl">{student.age} years old</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-gray-600 w-10">Sex:</span>
-                      <span className="text-xl">{student.sex}</span>
-                    </div>
-                  </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-10">
-                  <span className="text-gray-600 w-1">LRN:</span>
-                  <span className="font-mono text-red-800 px-4 rounded-lg text-xl tracking-wider">
-                    {student.lrn}
-                  </span>
+          {activeTab === 'grades' && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-800">Student Grades (View Only)</h3>
+                <button
+                  onClick={downloadGrades}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Grades
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-100 border-b-2 border-gray-300">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Subject</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Teacher</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Grade</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gradesData.map((item, index) => (
+                      <tr key={index} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-800">{item.subject}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{item.teacher}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
+                            {item.grade}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
+                            {item.remarks}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> Grades are view-only and cannot be modified. For any concerns, please contact your teacher.
+                </p>
+              </div>
+            </div>
+          )}
+
+
+          {activeTab === 'attendance' && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-800">Student Attendance</h3>
+                <button
+                  onClick={downloadAttendance}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Attendance
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-100 border-b-2 border-gray-300">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Day</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attendanceData.map((item, index) => (
+                      <tr key={index} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-800">{item.date}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{item.day}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                            item.status === 'Present' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {item.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-6 grid grid-cols-3 gap-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-600">Total Present</p>
+                  <p className="text-2xl font-bold text-green-700">18</p>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-600">Total Absent</p>
+                  <p className="text-2xl font-bold text-red-700">2</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-600">Attendance Rate</p>
+                  <p className="text-2xl font-bold text-blue-700">90%</p>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        <div className="max-w-5xl mx-auto space-y-12">
-            <div className="p-4 lg:p-8">
-              <GradesTable />
+          {activeTab === 'schedule' && (
+            <div>
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Student Schedule</h3>
+              <div className="space-y-3">
+                {scheduleData.map((item, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold text-gray-800">{item.subject}</p>
+                        <p className="text-sm text-gray-600">{item.teacher}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-red-900">{item.time}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div className="bg-red-800 text-white p-6 text-center">
-              <h2 className="text-3xl font-bold tracking-wide">My Attendance Record</h2>
-              <p className="text-sm opacity-90 mt-1">Daily Attendance Summary</p>
-            </div>
-            <div className="p-6">
-              <AttendanceCalendar />
-            </div>
-          </div>
+          )}
         </div>
-
-        <div className="text-center mt-12 text-gray-600">
-          <p className="text-sm">
-            For inquiries, contact your class adviser or visit the Registrar's Office.
-          </p>
-          <p className="text-xs mt-2">© 2025 WMSU ILS - Elementary Department</p>
-        </div>
-      </main>
+      </div>
     </div>
   );
-}
+};
+
+export default StudentPortal;
