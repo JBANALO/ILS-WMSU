@@ -66,16 +66,12 @@ export default function CreateAccount() {
       // Call the registration API
       const response = await authService.register(userData);
       
-      setSuccess(`${role} account created successfully! Redirecting...`);
+      setSuccess("✅ Account created! Pending admin approval. You'll be redirected to login...");
       
-      // Redirect based on role after successful registration
+      // Redirect to login page - admin must approve first
       setTimeout(() => {
-        if (role === "Student") {
-          navigate("/student/student-dashboard");
-        } else if (role === "Teacher") {
-          navigate("/teacher/teacher-dashboard");
-        }
-      }, 1200);
+        navigate("/login");
+      }, 2000);
       
     } catch (err) {
       console.error("Registration error:", err);

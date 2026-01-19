@@ -5,12 +5,13 @@ export const authService = {
   register: async (userData) => {
     try {
       const response = await api.post('/users/signup', userData);
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-      }
+      // Don't auto-login when registering a teacher from admin panel
+      // Only return response, don't store token
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Registration failed' };
+      const errorMsg = error?.response?.data?.message || error?.message || 'Registration failed';
+      const err = new Error(errorMsg);
+      throw err;
     }
   },
 
@@ -23,7 +24,9 @@ export const authService = {
       }
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Login failed' };
+      const errorMsg = error?.message || (typeof error === 'string' ? error : 'Login failed');
+      const err = new Error(errorMsg);
+      throw err;
     }
   },
 
@@ -40,6 +43,7 @@ export const authService = {
   // Logout user
   logout: () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
   },
 
   // Check if user is authenticated

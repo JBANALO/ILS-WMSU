@@ -7,8 +7,11 @@ import {
   CheckIcon, 
   XMarkIcon, 
   QrCodeIcon, 
-  EyeIcon 
+  EyeIcon,
+  ArrowUpTrayIcon,
+  KeyIcon
 } from "@heroicons/react/24/solid";
+import BulkImportModal from "../../components/modals/BulkImportModal";
 
 export default function AdminStudents() {
   const navigate = useNavigate();
@@ -18,7 +21,13 @@ export default function AdminStudents() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [editFormData, setEditFormData] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSection, setSelectedSection] = useState('All');
+  const [selectedStudents, setSelectedStudents] = useState(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   // Fetch students from API
   useEffect(() => {
@@ -27,12 +36,31 @@ export default function AdminStudents() {
 
   const fetchStudents = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/students');
-      const data = await response.json();
-      setStudents(data);
+      // Try the new backend API first
+      const response = await fetch('http://localhost:5000/api/students');
+      if (response.ok) {
+        const data = await response.json();
+        setStudents(Array.isArray(data) ? data : data.data || []);
+      } else {
+        console.warn('Could not fetch from new API, using empty list');
+        setStudents([]);
+      }
       setLoading(false);
     } catch (error) {
       console.error('Error fetching students:', error);
+      // Try alternative endpoint if primary fails
+      try {
+        const altResponse = await fetch('http://localhost:5000/api/students');
+        if (altResponse.ok) {
+          const data = await altResponse.json();
+          setStudents(data);
+        } else {
+          setStudents([]);
+        }
+      } catch (altError) {
+        console.error('Both APIs failed:', altError);
+        setStudents([]);
+      }
       setLoading(false);
     }
   };
@@ -46,6 +74,22 @@ export default function AdminStudents() {
   const pendingStudents = students.filter(s => 
     ['Grade 4', 'Grade 5', 'Grade 6'].includes(s.gradeLevel) && s.status === 'Pending'
   );
+
+  // Get all unique sections
+  const allSections = [...new Set(k3Students.map(s => s.section).filter(Boolean))];
+
+  // Search and filter K-3 students
+  const filteredK3Students = k3Students.filter(student => {
+    const matchesSearch = searchQuery === '' || 
+      (student.fullName && student.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (student.firstName && student.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (student.lastName && student.lastName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (student.lrn && student.lrn.includes(searchQuery));
+    
+    const matchesSection = selectedSection === 'All' || student.section === selectedSection;
+    
+    return matchesSearch && matchesSection;
+  });
 
   // VIEW QR CODE
   const handleViewQR = (student) => {
@@ -62,7 +106,7 @@ export default function AdminStudents() {
 
   const handleUpdateStudent = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/students/${selectedStudent.id}`, {
+      const response = await fetch(`http://localhost:5000/api/students/${selectedStudent.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -74,6 +118,8 @@ export default function AdminStudents() {
         alert('✅ Student updated successfully!');
         fetchStudents(); // Refresh list
         setShowEditModal(false);
+      } else {
+        alert('❌ Failed to update student: ' + response.statusText);
       }
     } catch (error) {
       console.error('Error updating student:', error);
@@ -86,13 +132,15 @@ export default function AdminStudents() {
     if (!window.confirm('Are you sure you want to delete this student?')) return;
 
     try {
-      const response = await fetch(`http://localhost:3001/api/students/${studentId}`, {
+      const response = await fetch(`http://localhost:5000/api/students/${studentId}`, {
         method: 'DELETE'
       });
 
       if (response.ok) {
         alert('✅ Student deleted successfully!');
         fetchStudents(); // Refresh list
+      } else {
+        alert('❌ Failed to delete student: ' + response.statusText);
       }
     } catch (error) {
       console.error('Error deleting student:', error);
@@ -112,6 +160,66 @@ export default function AdminStudents() {
     link.href = student.qrCode;
     link.download = `QR_${student.lrn}_${student.fullName}.png`;
     link.click();
+  };
+
+  // VIEW CREDENTIALS
+  const handleViewCredentials = (student) => {
+    setSelectedStudent(student);
+    setShowCredentialsModal(true);
+  };
+
+  // TOGGLE STUDENT SELECTION
+  const toggleStudentSelection = (studentId) => {
+    const newSelection = new Set(selectedStudents);
+    if (newSelection.has(studentId)) {
+      newSelection.delete(studentId);
+    } else {
+      newSelection.add(studentId);
+    }
+    setSelectedStudents(newSelection);
+  };
+
+  // TOGGLE SELECT ALL
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedStudents(new Set());
+      setSelectAll(false);
+    } else {
+      const allIds = new Set(filteredK3Students.map(s => s.id));
+      setSelectedStudents(allIds);
+      setSelectAll(true);
+    }
+  };
+
+  // BULK DELETE
+  const handleBulkDelete = async () => {
+    if (selectedStudents.size === 0) {
+      alert('Please select students to delete');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete ${selectedStudents.size} student(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      for (const studentId of selectedStudents) {
+        const response = await fetch(`http://localhost:5000/api/students/${studentId}`, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          successCount++;
+        }
+      }
+      alert(`✅ Successfully deleted ${successCount} student(s)`);
+      setSelectedStudents(new Set());
+      setSelectAll(false);
+      fetchStudents();
+    } catch (error) {
+      console.error('Error deleting students:', error);
+      alert('❌ Error deleting students');
+    }
   };
 
   return (
@@ -149,25 +257,107 @@ export default function AdminStudents() {
         </ul>
       </div>
 
-      <div className="flex justify-end mt-6">
+      <div className="flex justify-end gap-3 mt-6">
+        <button
+          onClick={() => setShowBulkImportModal(true)}
+          className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+        >
+          <ArrowUpTrayIcon className="w-5 h-5" />
+          Bulk Import (CSV)
+        </button>
         <button
           onClick={() => navigate("/admin/admin/create-k3")}
           className="bg-red-800 text-white px-5 py-2 rounded-lg hover:bg-red-700 transition"
         >
-          + Create Kinder–Grade 3 Account
+          + Create Individual Account
         </button>
       </div>
 
       {/* KINDER TO GRADE 3 STUDENTS TABLE */}
       <div className="mt-10">
-        <h3 className="text-xl font-bold text-red-800 mb-4">
-          Kinder to Grade 3 Students (Admin Created) - {k3Students.length} students
-        </h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-red-800">
+            Kinder to Grade 3 Students (Admin Created) - {filteredK3Students.length} students
+          </h3>
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-gray-600">
+              Total: {k3Students.length}
+            </div>
+            {selectedStudents.size > 0 ? (
+              <button
+                onClick={handleBulkDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-semibold"
+              >
+                🗑️ Delete {selectedStudents.size} Selected
+              </button>
+            ) : filteredK3Students.length > 0 && (
+              <button
+                onClick={() => {
+                  toggleSelectAll();
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-semibold"
+              >
+                📋 Select All
+              </button>
+            )}
+          </div>
+        </div>
 
+        {/* Search and Filter */}
+        <div className="bg-white rounded-lg shadow p-4 mb-4 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Search Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search by Name or LRN</label>
+              <input
+                type="text"
+                placeholder="Enter student name or LRN..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-800"
+              />
+            </div>
+
+            {/* Section Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Section</label>
+              <select
+                value={selectedSection}
+                onChange={(e) => setSelectedSection(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-800"
+              >
+                <option value="All">All Sections</option>
+                {allSections.map(section => (
+                  <option key={section} value={section}>{section}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Results Info */}
+          {(searchQuery || selectedSection !== 'All') && (
+            <div className="text-sm text-gray-600">
+              {searchQuery && <span>Searching for "{searchQuery}" • </span>}
+              {selectedSection !== 'All' && <span>Section: {selectedSection} • </span>}
+              <span className="font-semibold">{filteredK3Students.length} result{filteredK3Students.length !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Students Table */}
         <div className="overflow-x-auto bg-white rounded-lg shadow">
           <table className="w-full text-left border-collapse">
             <thead className="bg-red-100 text-red-800">
               <tr>
+                <th className="p-3 border w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectAll && filteredK3Students.length > 0}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 cursor-pointer"
+                    title="Select all students"
+                  />
+                </th>
                 <th className="p-3 border">LRN</th>
                 <th className="p-3 border">Name</th>
                 <th className="p-3 border">Sex</th>
@@ -182,22 +372,34 @@ export default function AdminStudents() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="p-6 text-center text-gray-500">
+                  <td colSpan="9" className="p-6 text-center text-gray-500">
                     Loading students...
                   </td>
                 </tr>
-              ) : k3Students.length === 0 ? (
+              ) : filteredK3Students.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="p-6 text-center text-gray-500">
-                    No students found. Create your first student account!
+                  <td colSpan="9" className="p-6 text-center text-gray-500">
+                    {searchQuery || selectedSection !== 'All' 
+                      ? 'No students match your search criteria.'
+                      : 'No students found. Create your first student account!'}
                   </td>
                 </tr>
               ) : (
-                k3Students.map((student) => (
+                filteredK3Students.map((student) => (
                   <tr key={student.id} className="hover:bg-gray-50">
+                    <td className="p-3 border text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.has(student.id)}
+                        onChange={() => toggleStudentSelection(student.id)}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </td>
                     <td className="p-3 border">{student.lrn}</td>
-                    <td className="p-3 border font-semibold">{student.fullName}</td>
-                    <td className="p-3 border">{student.sex}</td>
+                    <td className="p-3 border font-semibold">
+                      {student.fullName || `${student.firstName} ${student.lastName}` || 'N/A'}
+                    </td>
+                    <td className="p-3 border">{student.sex || 'N/A'}</td>
                     <td className="p-3 border">{student.gradeLevel}</td>
                     <td className="p-3 border">{student.section}</td>
                     <td className="p-3 border">
@@ -220,6 +422,13 @@ export default function AdminStudents() {
                         title="View Details"
                       >
                         <EyeIcon className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={() => handleViewCredentials(student)}
+                        className="p-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+                        title="View Credentials"
+                      >
+                        <KeyIcon className="w-5 h-5" />
                       </button>
                       <button 
                         onClick={() => handleEdit(student)}
@@ -303,19 +512,35 @@ export default function AdminStudents() {
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <h3 className="text-xl font-bold mb-4">QR Code - {selectedStudent.fullName}</h3>
             <div className="flex justify-center mb-4">
-              <img src={selectedStudent.qrCode} alt="QR Code" className="w-64 h-64 border-4 border-gray-300 rounded-lg" />
+              {selectedStudent.qrCode && selectedStudent.qrCode.startsWith('data:') ? (
+                <img 
+                  src={selectedStudent.qrCode} 
+                  alt="QR Code" 
+                  className="w-64 h-64 border-4 border-gray-300 rounded-lg"
+                  onError={(e) => {
+                    console.error('QR image load error:', e);
+                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22256%22 height=%22256%22%3E%3Crect fill=%22%23fff%22 width=%22256%22 height=%22256%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22Arial%22 font-size=%2216%22%3EQR Not Generated%3C/text%3E%3C/svg%3E';
+                  }}
+                />
+              ) : (
+                <div className="w-64 h-64 border-4 border-gray-300 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <p className="text-gray-500 text-center">No QR Code Available</p>
+                </div>
+              )}
             </div>
             <p className="text-center text-gray-600 mb-4">LRN: {selectedStudent.lrn}</p>
             <div className="flex gap-3">
-              <button
-                onClick={() => handleDownloadQR(selectedStudent)}
-                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-              >
-                Download QR
-              </button>
+              {selectedStudent.qrCode && selectedStudent.qrCode.startsWith('data:') && (
+                <button
+                  onClick={() => handleDownloadQR(selectedStudent)}
+                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                >
+                  Download QR
+                </button>
+              )}
               <button
                 onClick={() => setShowQRModal(false)}
-                className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600"
+                className={selectedStudent.qrCode && selectedStudent.qrCode.startsWith('data:') ? 'flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600' : 'w-full bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600'}
               >
                 Close
               </button>
@@ -356,6 +581,18 @@ export default function AdminStudents() {
                   onChange={(e) => setEditFormData({...editFormData, section: e.target.value})}
                   className="w-full border p-2 rounded-lg"
                 />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Sex</label>
+                <select
+                  value={editFormData.sex || ''}
+                  onChange={(e) => setEditFormData({...editFormData, sex: e.target.value})}
+                  className="w-full border p-2 rounded-lg"
+                >
+                  <option value="">Select Sex</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
               </div>
               <div>
                 <label className="block font-semibold mb-1">Contact</label>
@@ -427,6 +664,88 @@ export default function AdminStudents() {
           </div>
         </div>
       )}
+
+      {/* CREDENTIALS MODAL */}
+      {showCredentialsModal && selectedStudent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full">
+            <h3 className="text-2xl font-bold mb-6 text-red-800">Student Credentials</h3>
+            <div className="space-y-4 bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Student Name</label>
+                <p className="text-lg font-bold text-gray-900">{selectedStudent.fullName || `${selectedStudent.firstName} ${selectedStudent.lastName}`}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Username</label>
+                <div className="flex items-center justify-between bg-white p-3 rounded border border-gray-300">
+                  <p className="text-lg font-mono text-gray-900">{selectedStudent.username}</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedStudent.username);
+                      alert('Username copied to clipboard!');
+                    }}
+                    className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                <div className="flex items-center justify-between bg-white p-3 rounded border border-gray-300">
+                  <p className="text-sm font-mono text-gray-900 break-all">{selectedStudent.email}</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedStudent.email);
+                      alert('Email copied to clipboard!');
+                    }}
+                    className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                <div className="flex items-center justify-between bg-white p-3 rounded border border-gray-300">
+                  <p className="text-lg font-mono text-gray-900">{selectedStudent.password}</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedStudent.password);
+                      alert('Password copied to clipboard!');
+                    }}
+                    className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div className="bg-yellow-100 border border-yellow-400 p-3 rounded mt-4">
+                <p className="text-xs text-yellow-800">
+                  <strong>⚠️ Security Note:</strong> These credentials should be shared securely with the student's parents/guardians. Keep them confidential.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowCredentialsModal(false)}
+                className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK IMPORT MODAL */}
+      <BulkImportModal 
+        isOpen={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        onSuccess={() => {
+          fetchStudents(); // Refresh the students list
+        }}
+      />
     </div>
   );
 }

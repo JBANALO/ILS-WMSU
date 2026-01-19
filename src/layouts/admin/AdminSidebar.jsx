@@ -10,6 +10,7 @@ import {
   ChatBubbleLeftEllipsisIcon,
   BuildingLibraryIcon,
   ClipboardDocumentIcon,
+  ClockIcon,
 } from "@heroicons/react/24/solid";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -21,9 +22,12 @@ export default function AdminSidebar({ sidebarOpen, setSidebarOpen }) {
   const menuItems = [
     { name: "Dashboard", icon: <ChartBarIcon className="w-6 h-6" />, path: "/admin/admin-dashboard" },
     { name: "Teachers", icon: <UsersIcon className="w-6 h-6" />, path: "/admin/admin-teachers" },
+    { name: "Approvals", icon: <ClockIcon className="w-6 h-6" />, path: "/admin/approvals" },
     { name: "Students", icon: <AcademicCapIcon className="w-6 h-6" />, path: "/admin/admin-students" },
     { name: "Grades", icon: <ClipboardDocumentIcon className="w-6 h-6" />, path: "/admin/admin-grades" },
     { name: "Classes", icon: <BuildingLibraryIcon className="w-6 h-6" />, path: "/admin/admin-classes" },
+    { name: "Assign Adviser", icon: <UsersIcon className="w-6 h-6" />, path: "/admin/assign-adviser" },
+    { name: "Assign Subject Teacher", icon: <UsersIcon className="w-6 h-6" />, path: "/admin/assign-subject-teacher" },
     { name: "Attendance", icon: <ClipboardDocumentCheckIcon className="w-6 h-6" />, path: "/admin/admin-attendance" },
     { name: "Reports", icon: <DocumentChartBarIcon className="w-6 h-6" />, path: "/admin/admin-reports" },
   ];

@@ -4,8 +4,11 @@ const authController = require('../controllers/authController');
 
 const router = express.Router();
 
-// Authentication routes
+// Public routes
 router.post('/signup', userController.signup);
+router.post('/signup-batch', userController.signupBatch);
+router.get('/', userController.getAllUsers);
+router.get('/pending-teachers', userController.getPendingTeachers);
 
 // Protected routes (require authentication)
 router.use(authController.protect);
@@ -13,4 +16,13 @@ router.use(authController.protect);
 // Get current user
 router.get('/me', userController.getMe);
 
+// Delete user by ID
+router.delete('/:id', userController.deleteUser);
+
+// Update user by ID
+router.put('/:id', userController.updateUser);
+
+// Approve/Decline teacher routes
+router.post('/:id/approve', userController.approveTeacher);
+router.post('/:id/decline', userController.declineTeacher);
 module.exports = router;

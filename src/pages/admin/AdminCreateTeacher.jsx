@@ -10,6 +10,10 @@ export default function AdminCreateTeacher() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "teacher",
+    position: "",
+    gradeLevel: "",
+    section: "",
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -36,26 +40,37 @@ export default function AdminCreateTeacher() {
       return;
     }
 
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
       const teacherData = {
-        ...formData,
-        role: "teacher",
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+        role: formData.role,
+        position: formData.position,
+        gradeLevel: formData.gradeLevel,
+        section: formData.section,
       };
 
       const response = await authService.register(teacherData);
 
-      setSuccess("Teacher account created successfully.");
-      setFormData({
-        firstName: "",
-        lastName: "",
-        username: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-      });
+      setSuccess("Account created! Go to Approvals to assign the final role and approve.");
+      
+      // Redirect to approvals page after 2 seconds
+      setTimeout(() => {
+        navigate('/admin/approvals');
+      }, 2000);
     } catch (err) {
+      console.error('Registration error:', err);
       setError(err.message || "Failed to create teacher account.");
     } finally {
       setIsSubmitting(false);
@@ -149,8 +164,87 @@ export default function AdminCreateTeacher() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                className="mt-1 w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-800"
+                className={`mt-1 w-full p-2.5 border rounded-md focus:outline-none focus:ring-2 ${
+                  formData.password && formData.confirmPassword
+                    ? formData.password === formData.confirmPassword
+                      ? "border-green-500 focus:ring-green-500"
+                      : "border-red-500 focus:ring-red-500"
+                    : "border-gray-300 focus:ring-red-800"
+                }`}
               />
+              {formData.password && formData.confirmPassword && (
+                <p className={`text-xs mt-1 ${
+                  formData.password === formData.confirmPassword
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}>
+                  {formData.password === formData.confirmPassword
+                    ? "✓ Passwords match"
+                    : "✗ Passwords do not match"}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Role</label>
+            <select
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className="mt-1 w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-800"
+            >
+              <option value="teacher">Teacher</option>
+              <option value="subject_teacher">Subject Teacher</option>
+              <option value="adviser">Adviser</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Position</label>
+            <input
+              type="text"
+              name="position"
+              value={formData.position}
+              onChange={handleChange}
+              placeholder="e.g., Grade 3 Adviser"
+              className="mt-1 w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-800"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Grade Level</label>
+              <select
+                name="gradeLevel"
+                value={formData.gradeLevel}
+                onChange={handleChange}
+                className="mt-1 w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-800"
+              >
+                <option value="">Select Grade Level</option>
+                <option value="Kindergarten">Kindergarten</option>
+                <option value="Grade 1">Grade 1</option>
+                <option value="Grade 2">Grade 2</option>
+                <option value="Grade 3">Grade 3</option>
+                <option value="Grade 4">Grade 4</option>
+                <option value="Grade 5">Grade 5</option>
+                <option value="Grade 6">Grade 6</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Section</label>
+              <select
+                name="section"
+                value={formData.section}
+                onChange={handleChange}
+                className="mt-1 w-full p-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-800"
+              >
+                <option value="">Select Section</option>
+                <option value="Wisdom">Wisdom</option>
+                <option value="Kindness">Kindness</option>
+                <option value="Humility">Humility</option>
+                <option value="Diligence">Diligence</option>
+              </select>
             </div>
           </div>
 

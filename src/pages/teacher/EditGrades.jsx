@@ -14,13 +14,21 @@ export default function EditGrades() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState("Mathematics");
-  const [selectedQuarter, setSelectedQuarter] = useState("All Quarters");
+  const [selectedQuarter, setSelectedQuarter] = useState("q1");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGradeLevel, setSelectedGradeLevel] = useState("All Grades");
+  const [selectedSection, setSelectedSection] = useState("All Sections");
+  const [availableSections, setAvailableSections] = useState([]);
+  const [userRole, setUserRole] = useState(null);
+  const [assignedSubjects, setAssignedSubjects] = useState([]);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
   
   // Modal state
   const [showGradeModal, setShowGradeModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [gradeData, setGradeData] = useState({});
+  const [isGradeLocked, setIsGradeLocked] = useState(false);
+  const [lockReason, setLockReason] = useState("");
 
   // Subjects by grade level
   const subjectsByGrade = {
@@ -34,11 +42,87 @@ export default function EditGrades() {
     fetchStudents();
   }, []);
 
-  const fetchStudents = async () => {
+  // Update available sections when grade level changes
+  useEffect(() => {
+    if (selectedGradeLevel === "All Grades") {
+      const allSections = [...new Set(students.map(s => s.section))].sort();
+      setAvailableSections(allSections);
+    } else {
+      const sectionsForGrade = [...new Set(
+        students
+          .filter(s => s.gradeLevel === selectedGradeLevel)
+          .map(s => s.section)
+      )].sort();
+      setAvailableSections(sectionsForGrade);
+    }
+    setSelectedSection("All Sections");
+  }, [selectedGradeLevel, students]);
+
+  // Update available subjects based on user role and grade level
+  useEffect(() => {
+    if (userRole === 'adviser') {
+      // Advisers can edit all subjects for their grade
+      if (selectedGradeLevel === "All Grades") {
+        const allSubjects = [...new Set(Object.values(subjectsByGrade).flat())];
+        setAvailableSubjects(allSubjects);
+      } else {
+        setAvailableSubjects(subjectsByGrade[selectedGradeLevel] || []);
+      }
+    } else if (userRole === 'subject_teacher' && assignedSubjects.length > 0) {
+      // Subject teachers can only edit their assigned subjects
+      setAvailableSubjects(assignedSubjects);
+    }
+  }, [userRole, assignedSubjects, selectedGradeLevel]);  const fetchStudents = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/students');
+      // Get user info from localStorage
+      const userStr = localStorage.getItem("user");
+      let currentUserRole = null;
+      let userId = null;
+      
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        currentUserRole = user.role;
+        userId = user.id;
+        setUserRole(currentUserRole);
+        console.log('User role:', currentUserRole);
+      }
+
+      // Fetch students
+      const response = await fetch('http://localhost:5000/api/students');
       const data = await response.json();
-      setStudents(data);
+      setStudents(Array.isArray(data) ? data : []);
+
+      // If subject teacher, fetch assigned subjects from classes
+      if (currentUserRole === 'subject_teacher' && userId) {
+        const classesResponse = await fetch(`http://localhost:5000/api/classes/subject-teacher/${userId}`);
+        if (classesResponse.ok) {
+          const classesData = await classesResponse.json();
+          const classes = Array.isArray(classesData.data) ? classesData.data : [];
+          
+          // Extract all unique subjects from assigned classes
+          const subjects = [];
+          classes.forEach(cls => {
+            if (cls.subject_teachers && Array.isArray(cls.subject_teachers)) {
+              cls.subject_teachers.forEach(st => {
+                if (st.teacher_id === userId && st.subject && !subjects.includes(st.subject)) {
+                  subjects.push(st.subject);
+                }
+              });
+            }
+          });
+          
+          setAssignedSubjects(subjects);
+          console.log('Assigned subjects for subject teacher:', subjects);
+          
+          // Set first assigned subject as default
+          if (subjects.length > 0) {
+            setSelectedSubject(subjects[0]);
+          }
+        } else {
+          console.log('Failed to fetch classes:', classesResponse.status);
+        }
+      }
+
       setLoading(false);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -50,8 +134,31 @@ export default function EditGrades() {
   const openGradeModal = (student) => {
     setSelectedStudent(student);
     
+    // Check if grades are locked (1 day has passed since last save)
+    const lastEditTime = student.lastGradeEditTime ? new Date(student.lastGradeEditTime) : null;
+    const now = new Date();
+    const isLocked = lastEditTime && (now - lastEditTime) > 24 * 60 * 60 * 1000;
+    
+    if (isLocked) {
+      setIsGradeLocked(true);
+      setLockReason("Grades locked. 1 day has passed since last edit.");
+    } else if (lastEditTime) {
+      const hoursLeft = 24 - Math.floor((now - lastEditTime) / (60 * 60 * 1000));
+      setIsGradeLocked(false);
+      setLockReason(`You have ${hoursLeft} hours left to edit these grades.`);
+    } else {
+      setIsGradeLocked(false);
+      setLockReason("");
+    }
+    
     // Initialize grade data structure
-    const subjects = subjectsByGrade[student.gradeLevel] || [];
+    // For advisers: show all subjects; for subject teachers: show only assigned subjects
+    let subjects = subjectsByGrade[student.gradeLevel] || [];
+    if (userRole === 'subject_teacher' && availableSubjects.length > 0) {
+      // Only include subjects the teacher is assigned to
+      subjects = subjects.filter(s => availableSubjects.includes(s));
+    }
+    
     const initialGrades = {};
     
     subjects.forEach(subject => {
@@ -64,6 +171,7 @@ export default function EditGrades() {
     });
     
     setGradeData(initialGrades);
+    console.log('Grade modal opened - available subjects:', availableSubjects, 'initialized subjects:', Object.keys(initialGrades));
     setShowGradeModal(true);
   };
 
@@ -71,18 +179,41 @@ export default function EditGrades() {
   const calculateSubjectAverage = (subject) => {
     const grades = gradeData[subject];
     if (!grades) return 0;
-    const sum = grades.q1 + grades.q2 + grades.q3 + grades.q4;
-    return (sum / 4).toFixed(2);
+    
+    if (selectedQuarter === "all") {
+      // Average of all quarters
+      const values = [grades.q1, grades.q2, grades.q3, grades.q4].filter(v => v);
+      return values.length > 0 ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2) : 0;
+    } else {
+      // Single quarter
+      return grades[selectedQuarter] || 0;
+    }
   };
 
-  // Calculate final average (all subjects)
+  // Calculate final average based on selected quarter(s)
   const calculateFinalAverage = () => {
-    const subjects = Object.keys(gradeData);
+    let subjects = Object.keys(gradeData);
+    
+    // Filter to available subjects for subject teachers
+    if (userRole === 'subject_teacher' && availableSubjects.length > 0) {
+      subjects = subjects.filter(s => availableSubjects.includes(s));
+    }
+    
     if (subjects.length === 0) return 0;
     
-    const total = subjects.reduce((sum, subject) => {
-      return sum + parseFloat(calculateSubjectAverage(subject));
-    }, 0);
+    let total = 0;
+    if (selectedQuarter === "all") {
+      // Average of all quarters for all subjects
+      subjects.forEach(subject => {
+        const subAvg = calculateSubjectAverage(subject);
+        total += parseFloat(subAvg) || 0;
+      });
+    } else {
+      // Only selected quarter
+      subjects.forEach(subject => {
+        total += gradeData[subject][selectedQuarter] || 0;
+      });
+    }
     
     return (total / subjects.length).toFixed(2);
   };
@@ -98,6 +229,17 @@ export default function EditGrades() {
 
   // Handle grade input change
   const handleGradeChange = (subject, quarter, value) => {
+    // Allow empty value (for clearing)
+    if (value === '') {
+      setGradeData(prev => ({
+        ...prev,
+        [subject]: {
+          ...prev[subject],
+          [quarter]: ''
+        }
+      }));
+      return;
+    }
     const numValue = Math.min(100, Math.max(0, parseInt(value) || 0));
     setGradeData(prev => ({
       ...prev,
@@ -108,26 +250,95 @@ export default function EditGrades() {
     }));
   };
 
+  // Clear grade value
+  const clearGrade = (subject, quarter) => {
+    setGradeData(prev => ({
+      ...prev,
+      [subject]: {
+        ...prev[subject],
+        [quarter]: ''
+      }
+    }));
+  };
+
   // Save grades to backend
   const saveGrades = async () => {
+    if (isGradeLocked) {
+      alert("❌ These grades are locked and cannot be edited.");
+      return;
+    }
+
+    // Check for unauthorized subject edits (for subject teachers)
+    if (userRole === 'subject_teacher' && availableSubjects.length > 0) {
+      const editedSubjects = Object.keys(gradeData).filter(subject => {
+        const quarterData = gradeData[subject];
+        if (selectedQuarter === "all") {
+          return quarterData.q1 || quarterData.q2 || quarterData.q3 || quarterData.q4;
+        } else {
+          return quarterData[selectedQuarter];
+        }
+      });
+      
+      const unauthorizedSubjects = editedSubjects.filter(s => !availableSubjects.includes(s));
+      if (unauthorizedSubjects.length > 0) {
+        alert(`❌ You don't have permission to edit: ${unauthorizedSubjects.join(', ')}`);
+        return;
+      }
+    }
+
     try {
       const finalAverage = calculateFinalAverage();
+      const quarterMap = {
+        'q1': 'q1',
+        'q2': 'q2', 
+        'q3': 'q3',
+        'q4': 'q4',
+        'all': 'all'
+      };
+      const quarterValue = quarterMap[selectedQuarter] || 'q1';
       
-      const response = await fetch(`http://localhost:3001/api/students/${selectedStudent.id}/grades`, {
+      // Extract grades for the selected quarter(s)
+      const quarterGrades = {};
+      Object.keys(gradeData).forEach(subject => {
+        // For subject teachers, only include authorized subjects
+        if (userRole === 'subject_teacher' && availableSubjects.length > 0 && !availableSubjects.includes(subject)) {
+          return;
+        }
+        
+        if (selectedQuarter === "all") {
+          quarterGrades[subject] = {
+            q1: gradeData[subject].q1 || 0,
+            q2: gradeData[subject].q2 || 0,
+            q3: gradeData[subject].q3 || 0,
+            q4: gradeData[subject].q4 || 0,
+          };
+        } else {
+          quarterGrades[subject] = gradeData[subject][selectedQuarter] || 0;
+        }
+      });
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/students/${selectedStudent.id}/grades`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
-          grades: gradeData,
-          average: parseFloat(finalAverage)
+          grades: quarterGrades,
+          average: parseFloat(finalAverage),
+          quarter: quarterValue,
+          lastGradeEditTime: new Date().toISOString()
         })
       });
 
       if (response.ok) {
-        alert('✅ Grades saved successfully!');
+        alert(`✅ Grades saved successfully! You have 24 hours to edit them again.`);
         fetchStudents();
         setShowGradeModal(false);
       } else {
-        alert('❌ Failed to save grades');
+        const errorData = await response.json();
+        alert(`❌ Failed to save grades: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error saving grades:', error);
@@ -136,10 +347,19 @@ export default function EditGrades() {
   };
 
   // Filter students
-  const filteredStudents = students.filter(student => 
-    student.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.lrn.includes(searchQuery)
-  );
+  const filteredStudents = students.filter(student => {
+    // Filter by search query (name or LRN)
+    const matchesSearch = student.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.lrn.includes(searchQuery);
+    
+    // Filter by grade level
+    const matchesGrade = selectedGradeLevel === "All Grades" || student.gradeLevel === selectedGradeLevel;
+    
+    // Filter by section
+    const matchesSection = selectedSection === "All Sections" || student.section === selectedSection;
+    
+    return matchesSearch && matchesGrade && matchesSection;
+  });
 
   // Calculate class statistics
   const classAverage = students.length > 0
@@ -218,10 +438,32 @@ export default function EditGrades() {
 
       {/* Filter Section */}
       <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Select Quarter</label>
+            <select 
+              value={selectedQuarter} 
+              onChange={(e) => setSelectedQuarter(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 font-semibold"
+            >
+              <option value="q1">Quarter 1</option>
+              <option value="q2">Quarter 2</option>
+              <option value="q3">Quarter 3</option>
+              <option value="q4">Quarter 4</option>
+              <option value="all">📊 All Quarters</option>
+            </select>
+          </div>
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Grade Level</label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500">
+            <select 
+              value={selectedGradeLevel}
+              onChange={(e) => {
+                setSelectedGradeLevel(e.target.value);
+                setSelectedSection("All Sections");
+              }}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
               <option>All Grades</option>
               <option>Kindergarten</option>
               <option>Grade 1</option>
@@ -229,16 +471,18 @@ export default function EditGrades() {
               <option>Grade 3</option>
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500">
+            <select 
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
               <option>All Sections</option>
-              <option>Love</option>
-              <option>Humility</option>
-              <option>Kindness</option>
-              <option>Diligence</option>
-              <option>Wisdom</option>
+              {availableSections.map((section) => (
+                <option key={section}>{section}</option>
+              ))}
             </select>
           </div>
           
@@ -258,7 +502,9 @@ export default function EditGrades() {
       {/* Students Table */}
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
         <div className="px-8 py-6 border-b border-gray-200">
-          <h3 className="text-xl font-bold text-gray-900">Student List - Click Name to Edit Grades</h3>
+          <h3 className="text-xl font-bold text-gray-900">
+            Student List - {selectedQuarter === 'q1' ? 'Quarter 1' : selectedQuarter === 'q2' ? 'Quarter 2' : selectedQuarter === 'q3' ? 'Quarter 3' : selectedQuarter === 'q4' ? 'Quarter 4' : 'All Quarters'} | Click Name to Edit Grades
+          </h3>
           <p className="text-sm text-gray-600 mt-1">Click on any student's name to edit their grades</p>
         </div>
 
@@ -351,6 +597,11 @@ export default function EditGrades() {
                 <p className="text-red-100 text-sm mt-1">
                   {selectedStudent.gradeLevel} - {selectedStudent.section} | LRN: {selectedStudent.lrn}
                 </p>
+                {lockReason && (
+                  <p className={`text-sm mt-2 font-semibold ${isGradeLocked ? 'text-red-200' : 'text-yellow-200'}`}>
+                    {lockReason}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setShowGradeModal(false)}
@@ -362,43 +613,121 @@ export default function EditGrades() {
 
             {/* Grades Table */}
             <div className="p-8">
+              {isGradeLocked && (
+                <div className="mb-6 p-4 bg-red-100 border border-red-300 rounded-lg">
+                  <p className="text-red-800 font-semibold">🔒 These grades are locked and cannot be edited.</p>
+                </div>
+              )}
               <div className="overflow-x-auto scrollbar-hide">
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-100">
                       <th className="px-4 py-3 text-left font-semibold text-gray-700 border">Subject</th>
-                      <th className="px-4 py-3 text-center font-semibold text-gray-700 border">Q1</th>
-                      <th className="px-4 py-3 text-center font-semibold text-gray-700 border">Q2</th>
-                      <th className="px-4 py-3 text-center font-semibold text-gray-700 border">Q3</th>
-                      <th className="px-4 py-3 text-center font-semibold text-gray-700 border">Q4</th>
+                      {selectedQuarter === 'all' ? (
+                        <>
+                          <th className="px-4 py-3 text-center font-semibold text-gray-700 border">Q1</th>
+                          <th className="px-4 py-3 text-center font-semibold text-gray-700 border">Q2</th>
+                          <th className="px-4 py-3 text-center font-semibold text-gray-700 border">Q3</th>
+                          <th className="px-4 py-3 text-center font-semibold text-gray-700 border">Q4</th>
+                        </>
+                      ) : (
+                        <th className="px-4 py-3 text-center font-semibold text-gray-700 border">
+                          {selectedQuarter === 'q1' ? 'Q1' : selectedQuarter === 'q2' ? 'Q2' : selectedQuarter === 'q3' ? 'Q3' : 'Q4'}
+                        </th>
+                      )}
                       <th className="px-4 py-3 text-center font-semibold text-gray-700 border bg-blue-50">Average</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.keys(gradeData).map((subject) => (
-                      <tr key={subject} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900 border">{subject}</td>
-                        {['q1', 'q2', 'q3', 'q4'].map((quarter) => (
-                          <td key={quarter} className="px-4 py-3 border">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={gradeData[subject][quarter]}
-                              onChange={(e) => handleGradeChange(subject, quarter, e.target.value)}
-                              className="w-20 text-center border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
-                            />
-                          </td>
-                        ))}
-                        <td className="px-4 py-3 text-center font-bold text-blue-700 border bg-blue-50">
-                          {calculateSubjectAverage(subject)}
-                        </td>
-                      </tr>
-                    ))}
+                    {Object.keys(gradeData)
+                      .filter(subject => {
+                        // Show all subjects for advisers, only assigned subjects for teachers
+                        if (userRole === 'adviser' || availableSubjects.length === 0) {
+                          return true;
+                        }
+                        return availableSubjects.includes(subject);
+                      })
+                      .map((subject) => {
+                        const isUnauthorized = userRole === 'subject_teacher' && availableSubjects.length > 0 && !availableSubjects.includes(subject);
+                        
+                        return (
+                          <tr key={subject} className={`${isUnauthorized ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}`}>
+                            <td className="px-4 py-3 font-medium text-gray-900 border">
+                              {subject}
+                              {isUnauthorized && <span className="text-xs text-gray-500 ml-2">(Not assigned)</span>}
+                            </td>
+                            
+                            {/* Render quarters based on selection */}
+                            {selectedQuarter === 'all' 
+                              ? (
+                                  <>
+                                    {['q1', 'q2', 'q3', 'q4'].map((quarter) => (
+                                      <td key={quarter} className="px-4 py-3 border">
+                                        <div className="flex items-center gap-1">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            placeholder="-"
+                                            value={gradeData[subject][quarter]}
+                                            onChange={(e) => handleGradeChange(subject, quarter, e.target.value)}
+                                            disabled={isGradeLocked || isUnauthorized}
+                                            className={`w-16 text-center border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 ${isGradeLocked || isUnauthorized ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                            title={isUnauthorized ? 'You do not have permission to edit this subject' : ''}
+                                          />
+                                          {!isGradeLocked && !isUnauthorized && gradeData[subject][quarter] !== '' && gradeData[subject][quarter] !== 0 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => clearGrade(subject, quarter)}
+                                              className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded px-1.5 py-1 transition text-sm font-bold"
+                                              title="Clear grade"
+                                            >
+                                              ✕
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    ))}
+                                  </>
+                                )
+                              : (
+                                  <td className="px-4 py-3 border">
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        placeholder="-"
+                                        value={gradeData[subject][selectedQuarter]}
+                                        onChange={(e) => handleGradeChange(subject, selectedQuarter, e.target.value)}
+                                        disabled={isGradeLocked || isUnauthorized}
+                                        className={`w-16 text-center border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 ${isGradeLocked || isUnauthorized ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                        title={isUnauthorized ? 'You do not have permission to edit this subject' : ''}
+                                      />
+                                      {!isGradeLocked && !isUnauthorized && gradeData[subject][selectedQuarter] !== '' && gradeData[subject][selectedQuarter] !== 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => clearGrade(subject, selectedQuarter)}
+                                          className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded px-1.5 py-1 transition text-sm font-bold"
+                                          title="Clear grade"
+                                        >
+                                          ✕
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                )}
+                            
+                            <td className="px-4 py-3 text-center font-bold text-blue-700 border bg-blue-50">
+                              {calculateSubjectAverage(subject)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                   <tfoot>
                     <tr className="bg-gray-100">
-                      <td colSpan="5" className="px-4 py-4 text-right font-bold text-gray-900 border">
+                      <td colSpan={selectedQuarter === 'all' ? '6' : '3'} className="px-4 py-4 text-right font-bold text-gray-900 border">
                         Final Average:
                       </td>
                       <td className="px-4 py-4 text-center font-bold text-green-700 border text-2xl">
@@ -406,7 +735,7 @@ export default function EditGrades() {
                       </td>
                     </tr>
                     <tr className="bg-gray-50">
-                      <td colSpan="5" className="px-4 py-3 text-right font-semibold text-gray-700 border">
+                      <td colSpan={selectedQuarter === 'all' ? '6' : '3'} className="px-4 py-3 text-right font-semibold text-gray-700 border">
                         Remarks:
                       </td>
                       <td className="px-4 py-3 text-center font-semibold border">
@@ -428,7 +757,12 @@ export default function EditGrades() {
               <div className="flex gap-4 mt-8">
                 <button
                   onClick={saveGrades}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg"
+                  disabled={isGradeLocked}
+                  className={`flex-1 py-4 rounded-xl font-bold text-lg transition shadow-lg ${
+                    isGradeLocked
+                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
                 >
                   💾 Save Grades
                 </button>

@@ -44,9 +44,14 @@ export default function LoginPage() {
         return;
       }
 
+      // Store user data in localStorage
+      if (user) {
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+
       if (role === "admin") {
         navigate("/admin/admin-dashboard");
-      } else if (role === "teacher") {
+      } else if (role === "teacher" || role === "subject_teacher" || role === "adviser") {
         navigate("/teacher/teacher-dashboard");
       } else {
         navigate("/student/student-dashboard");

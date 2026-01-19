@@ -1,17 +1,42 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { UserCircleIcon, PencilIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/solid";
+import { authService } from "../../api/userService";
 
 export default function TeacherProfile() {
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState({
-    firstName: "Maria",
-    lastName: "Mercedes",
-    email: "maria.mercedes@wmsu.edu.ph",
+    firstName: "",
+    lastName: "",
+    email: "",
     department: "WMSU-ILS Department",
-    position: "Grade 3 Adviser",
-    subjects: "English, Filipino, Arpan",
+    position: "",
+    subjects: "",
     bio: "Dedicated educator with a passion for teaching and student development."
   });
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await authService.getCurrentUser();
+        if (response.data && response.data.user) {
+          const user = response.data.user;
+          setProfileData(prev => ({
+            ...prev,
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
+            email: user.email || "",
+            position: user.position || "Teacher"
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch user data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUserData();
+  }, []);
 
   const [schedules, setSchedules] = useState([
     { id: 1, day: "Monday - Friday", time: "8:00 AM - 9:00 AM", subject: "English", gradeSection: "Grade 3 - Wisdom" },
@@ -46,8 +71,9 @@ export default function TeacherProfile() {
     setSchedules(schedules.filter(schedule => schedule.id !== id));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsEditing(false);
+    // TODO: Add API call to update user profile on backend
     alert("Profile updated successfully!");
   };
 
@@ -55,6 +81,10 @@ export default function TeacherProfile() {
     setIsEditing(false);
     // Reset to original data if needed
   };
+
+  if (loading) {
+    return <div className="flex items-center justify-center p-8">Loading profile...</div>;
+  }
 
   return (
     <div className="space-y-6">

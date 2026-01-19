@@ -1,10 +1,29 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BellIcon, UserCircleIcon, ChevronDownIcon } from "@heroicons/react/24/solid";
+import { authService } from "../../api/userService";
 
 export default function TeacherTopbar({ sidebarOpen }) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [userName, setUserName] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await authService.getCurrentUser();
+        if (response.data && response.data.user) {
+          const user = response.data.user;
+          localStorage.setItem('user', JSON.stringify(user));
+          const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "User";
+          setUserName(fullName);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user data:", error);
+      }
+    };
+    fetchUser();
+  }, []);
 
   const handleLogout = () => navigate("/login");
   const handleMainDashboard = () => navigate("/teacher/teacher-dashboard");
@@ -43,7 +62,7 @@ export default function TeacherTopbar({ sidebarOpen }) {
           {showDropdown && (
             <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg w-56 text-sm z-10 animate-fadeIn">
               <div className="px-4 py-2 border-b font-semibold">
-                Ashley Villanueva
+                {userName || "Loading..."}
               </div>
               <ul>
                 <li 

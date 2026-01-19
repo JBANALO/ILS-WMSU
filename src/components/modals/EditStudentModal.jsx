@@ -47,6 +47,9 @@ export default function EditStudentModal({ student, formData, setFormData, onSav
             <input type="text" placeholder="Middle Name" value={formData.middleName || ""} onChange={e => setFormData({ ...formData, middleName: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500 focus:border-transparent" />
             <input type="text" placeholder="Last Name" value={formData.lastName || ""} onChange={e => setFormData({ ...formData, lastName: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500 focus:border-transparent" />
 
+            {/* LRN Field */}
+            <input type="text" placeholder="LRN" value={formData.lrn || ""} onChange={e => setFormData({ ...formData, lrn: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+
             <div className="grid grid-cols-2 gap-4">
               <input type="number" placeholder="Age" value={formData.age || ""} onChange={e => setFormData({ ...formData, age: e.target.value })} className="border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500" />
               <select value={formData.sex || ""} onChange={e => setFormData({ ...formData, sex: e.target.value })} className="border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500">

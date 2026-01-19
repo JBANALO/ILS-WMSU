@@ -22,11 +22,15 @@ import TeacherProfile from "./pages/teacher/TeacherProfile";
 import AdminLayout from "./layouts/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTeachers from "./pages/admin/AdminTeachers";
+import AdminApprovals from "./pages/admin/AdminApprovals";
+import AdminTeacherApproval from "./pages/admin/AdminTeacherApproval";
 import AdminStudents from "./pages/admin/AdminStudents";
 import AdminCreateK3 from "./pages/admin/AdminCreateK3.jsx";
 import AdminGrades from "./pages/admin/AdminGrades";
 import AdminClasses from "./pages/admin/AdminClasses";
 import AdminClassList from "./pages/admin/AdminClassList.jsx";
+import AdminAssignAdviser from "./pages/admin/AdminAssignAdviser.jsx";
+import AdminAssignSubjectTeacher from "./pages/admin/AdminAssignSubjectTeacher.jsx";
 import AdminAttendance from "./pages/admin/AdminAttendance";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminCreateTeacher from "./pages/admin/AdminCreateTeacher.jsx";
@@ -61,10 +65,14 @@ function App() {
         <Route element={<AdminLayout />}>
           <Route path="/admin/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/admin/admin-teachers" element={<AdminTeachers />} />
+          <Route path="/admin/approvals" element={<AdminApprovals />} />
+          <Route path="/admin/teacher-approvals" element={<AdminTeacherApproval />} />
           <Route path="/admin/admin-students" element={<AdminStudents />} />
           <Route path="/admin/admin/create-k3" element={<AdminCreateK3 />} />
           <Route path="/admin/admin-grades" element={<AdminGrades />} />
           <Route path="/admin/admin-classes" element={<AdminClasses />} />
+          <Route path="/admin/assign-adviser" element={<AdminAssignAdviser />} />
+          <Route path="/admin/assign-subject-teacher" element={<AdminAssignSubjectTeacher />} />
           <Route path="/admin/admin/classlist/:id" element={<AdminClassList />} />
           <Route path="/admin/admin-attendance" element={<AdminAttendance />} />
           <Route path="/admin/admin-reports" element={<AdminReports />} />

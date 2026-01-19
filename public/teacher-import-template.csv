@@ -1,0 +1,7 @@
+firstName,lastName,email,username,position,isSubjectTeacher,subjects
+Maria,Santos,,maria.santos,Grade 3 Adviser,false,
+Juan,Cruz,,juan.cruz,Grade 3 Adviser,false,
+Ana,Reyes,,ana.reyes,Grade 2 Adviser,false,
+Roberto,Mendoza,,roberto.mendoza,Subject Teacher,true,Mathematics; Science
+Teresa,Lopez,,teresa.lopez,Subject Teacher,true,English; Filipino
+Pedro,Ramos,,pedro.ramos,Subject Teacher,true,Science

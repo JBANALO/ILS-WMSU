@@ -1,0 +1,70 @@
+[
+  {
+    "id": "kindergarten-love",
+    "grade": "Kindergarten",
+    "section": "Love",
+    "adviser_id": null,
+    "adviser_name": null,
+    "subject_teachers": [],
+    "createdAt": "2025-12-30T00:00:00.000Z"
+  },
+  {
+    "id": "grade-1-wisdom",
+    "grade": "Grade 1",
+    "section": "Wisdom",
+    "adviser_id": null,
+    "adviser_name": null,
+    "subject_teachers": [],
+    "createdAt": "2025-12-30T00:00:00.000Z"
+  },
+  {
+    "id": "grade-2-kindness",
+    "grade": "Grade 2",
+    "section": "Kindness",
+    "adviser_id": "63bc1bd0-359f-4372-8581-5a626e5e16f7",
+    "adviser_name": "Josie Banalo",
+    "subject_teachers": [],
+    "createdAt": "2025-12-30T05:26:32.215Z"
+  },
+  {
+    "id": "grade-3-diligence",
+    "grade": "Grade 3",
+    "section": "Diligence",
+    "adviser_id": "a7071ec7-800f-4d31-8e05-c5e1bf75c47b",
+    "adviser_name": "Chrisjame Toribio",
+    "subject_teachers": [
+      {
+        "teacher_id": "63bc1bd0-359f-4372-8581-5a626e5e16f7",
+        "teacher_name": "Josie Banalo",
+        "subject": "Social Studies",
+        "assignedAt": "2026-01-19T11:55:11.150Z"
+      }
+    ],
+    "createdAt": "2025-12-30T05:24:35.130Z"
+  },
+  {
+    "id": "grade-1-humility",
+    "grade": "Grade 1",
+    "section": "Humility",
+    "adviser_id": null,
+    "adviser_name": null,
+    "createdAt": "2025-12-30T05:28:43.820Z",
+    "subject_teachers": [
+      {
+        "teacher_id": "63bc1bd0-359f-4372-8581-5a626e5e16f7",
+        "teacher_name": "Josie Banalo",
+        "subject": "English",
+        "assignedAt": "2026-01-06T18:12:52.232Z"
+      }
+    ]
+  },
+  {
+    "id": "grade-3-wisdom",
+    "grade": "Grade 3",
+    "section": "Wisdom",
+      "adviser_id": "63bc1bd0-359f-4372-8581-5a626e5e16f7",
+      "adviser_name": "Josie Banalo",
+      "subject_teachers": [],
+    "createdAt": "2026-01-03T07:13:25.141Z"
+  }
+]

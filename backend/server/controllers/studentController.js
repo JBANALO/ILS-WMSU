@@ -1,28 +1,47 @@
 // server/controllers/studentController.js
 const pool = require('../config/db');
 const QRCode = require('qrcode');
+const fs = require('fs');
+const path = require('path');
+
+// JSON file path for students data
+const studentsFilePath = path.join(__dirname, '../../../data/students.json');
+
+const readStudents = () => {
+  try {
+    console.log(`Reading students from: ${studentsFilePath}`);
+    const data = fs.readFileSync(studentsFilePath, 'utf8');
+    const students = JSON.parse(data);
+    console.log(`Successfully read ${students.length} students`);
+    return students;
+  } catch (error) {
+    console.error('Error reading students.json:', error.message);
+    console.error('Expected path:', studentsFilePath);
+    return [];
+  }
+};
 
 const formatStudent = (student) => ({
   id: student.id,
   lrn: student.lrn,
-  firstName: student.first_name,
-  middleName: student.middle_name,
-  lastName: student.last_name,
-  fullName: student.full_name,
+  firstName: student.firstName,
+  middleName: student.middleName,
+  lastName: student.lastName,
+  fullName: student.fullName,
   age: student.age,
   sex: student.sex,
-  gradeLevel: student.grade_level,
+  gradeLevel: student.gradeLevel,
   section: student.section,
   contact: student.contact,
-  wmsuEmail: student.wmsu_email,
-  qrCode: student.qr_code,
-  profilePic: student.profile_pic,
+  wmsuEmail: student.wmsuEmail,
+  qrCode: student.qrCode,
+  profilePic: student.profilePic,
   status: student.status,
   attendance: student.attendance,
   average: student.average,
-  createdBy: student.created_by,
-  createdAt: student.created_at,
-  updatedAt: student.updated_at
+  createdBy: student.createdBy,
+  createdAt: student.createdAt,
+  updatedAt: student.updatedAt
 });
 
 const createStudent = async (req, res) => {
@@ -63,18 +82,22 @@ const createStudent = async (req, res) => {
 const getAllStudents = async (req, res) => {
   try {
     const { gradeLevel, section, status } = req.query;
-    let sql = 'SELECT * FROM students WHERE 1=1';
-    const params = [];
+    let students = readStudents();
 
-    if (gradeLevel) { sql += ' AND grade_level = ?'; params.push(gradeLevel); }
-    if (section) { sql += ' AND section = ?'; params.push(section); }
-    if (status) { sql += ' AND status = ?'; params.push(status); }
+    // Filter by query parameters
+    if (gradeLevel) {
+      students = students.filter(s => s.gradeLevel === gradeLevel);
+    }
+    if (section) {
+      students = students.filter(s => s.section === section);
+    }
+    if (status) {
+      students = students.filter(s => s.status === status);
+    }
 
-    sql += ' ORDER BY created_at DESC';
-
-    const [rows] = await pool.query(sql, params);
-    res.json(rows.map(formatStudent));
+    res.json(students);
   } catch (err) {
+    console.error('getAllStudents error:', err);
     res.status(500).json({ error: 'Failed to fetch students', details: err.message });
   }
 };
@@ -82,16 +105,18 @@ const getAllStudents = async (req, res) => {
 const getStudentById = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!id || isNaN(id)) {
+    if (!id) {
       return res.status(400).json({ error: 'Invalid student ID' });
     }
 
-    const [rows] = await pool.query('SELECT * FROM students WHERE id = ?', [id]);
-    if (!rows || rows.length === 0) {
+    const students = readStudents();
+    const student = students.find(s => s.id === id);
+    
+    if (!student) {
       return res.status(404).json({ error: 'Student not found' });
     }
 
-    res.json(formatStudent(rows[0]));
+    res.json(student);
   } catch (err) {
     console.error('getStudentById error:', err);
     res.status(500).json({ error: 'Server error', details: err.message });
@@ -101,54 +126,55 @@ const getStudentById = async (req, res) => {
 const updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = [];
-    const values = [];
+    const students = readStudents();
+    const studentIndex = students.findIndex(s => s.id === id);
+    
+    if (studentIndex === -1) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
 
-    const [existing] = await pool.query('SELECT * FROM students WHERE id = ?', [id]);
-    if (!existing.length) return res.status(404).json({ error: 'Student not found' });
-    const student = existing[0];
-
+    const student = students[studentIndex];
     const fields = {
-      firstName: 'first_name',
-      middleName: 'middle_name',
-      lastName: 'last_name',
-      age: 'age',
-      sex: 'sex',
-      gradeLevel: 'grade_level',
-      section: 'section',
-      contact: 'contact',
-      wmsuEmail: 'wmsu_email',
-      status: 'status',
-      attendance: 'attendance',
-      average: 'average',
-      profilePic: 'profile_pic',
-      qrCode: 'qr_code'
+      firstName: true,
+      middleName: true,
+      lastName: true,
+      age: true,
+      sex: true,
+      gradeLevel: true,
+      section: true,
+      contact: true,
+      wmsuEmail: true,
+      status: true,
+      attendance: true,
+      average: true,
+      profilePic: true,
+      qrCode: true
     };
 
-    for (const [key, dbKey] of Object.entries(fields)) {
+    // Update fields
+    for (const [key] of Object.entries(fields)) {
       if (req.body[key] !== undefined) {
-        updates.push(`${dbKey} = ?`);
-        values.push(req.body[key] === '' && key.includes('Pic') ? null : req.body[key]);
+        student[key] = req.body[key] === '' && key.includes('Pic') ? null : req.body[key];
       }
     }
 
-    // Rebuild full_name if name changed
+    // Rebuild fullName if name changed
     if (req.body.firstName || req.body.middleName || req.body.lastName) {
-      const f = req.body.firstName ?? student.first_name;
-      const m = req.body.middleName ?? student.middle_name;
-      const l = req.body.lastName ?? student.last_name;
-      updates.push('full_name = ?');
-      values.push(`${f} ${m} ${l}`.trim());
+      const f = req.body.firstName ?? student.firstName;
+      const m = req.body.middleName ?? student.middleName;
+      const l = req.body.lastName ?? student.lastName;
+      student.fullName = `${f} ${m || ''} ${l}`.trim();
     }
 
-    if (!updates.length) return res.status(400).json({ error: 'No fields to update' });
-
-    values.push(id);
-    await pool.query(`UPDATE students SET ${updates.join(', ')} WHERE id = ?`, values);
-
-    const [[updated]] = await pool.query('SELECT * FROM students WHERE id = ?', [id]);
-    res.json({ message: 'Student updated successfully', student: formatStudent(updated) });
+    student.updatedAt = new Date().toISOString();
+    students[studentIndex] = student;
+    
+    // Write back to file
+    fs.writeFileSync(studentsFilePath, JSON.stringify(students, null, 2));
+    
+    res.json({ message: 'Student updated successfully', student });
   } catch (err) {
+    console.error('updateStudent error:', err);
     res.status(500).json({ error: 'Failed to update student', details: err.message });
   }
 };
@@ -156,11 +182,20 @@ const updateStudent = async (req, res) => {
 const deleteStudent = async (req, res) => {
   try {
     const { id } = req.params;
-    const [result] = await pool.query('DELETE FROM students WHERE id = ?', [id]);
-    if (!result.affectedRows) return res.status(404).json({ error: 'Student not found' });
+    const students = readStudents();
+    const studentIndex = students.findIndex(s => s.id === id);
+    
+    if (studentIndex === -1) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    students.splice(studentIndex, 1);
+    fs.writeFileSync(studentsFilePath, JSON.stringify(students, null, 2));
+    
     res.json({ message: 'Student deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to delete', details: err.message });
+    console.error('deleteStudent error:', err);
+    res.status(500).json({ error: 'Failed to delete student', details: err.message });
   }
 };
 

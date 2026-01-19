@@ -58,4 +58,64 @@ router.get('/portal', async (req, res) => {
   }
 });
 
+// Get students under current teacher/adviser
+router.get('/my-students', async (req, res) => {
+  try {
+    const user = req.user; // From JWT token
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    let query = `
+      SELECT id, lrn, first_name, middle_name, last_name, full_name, age, sex,
+             grade_level, section, contact, wmsu_email, status, attendance, average,
+             profile_pic, qr_code, created_by, created_at, updated_at
+      FROM students
+    `;
+    const params = [];
+
+    // Filter students based on teacher/adviser role
+    if (user.role === 'adviser' && user.sectionHandled) {
+      query += ` WHERE section = ?`;
+      params.push(user.sectionHandled);
+    } else if (user.role === 'subject_teacher') {
+      // Subject teachers see all students (can be refined based on your needs)
+      // Or restrict to specific sections if configured
+    } else if (user.role !== 'admin') {
+      return res.status(403).json({ error: 'Not authorized to view students' });
+    }
+
+    query += ` ORDER BY full_name ASC`;
+
+    const [students] = await pool.query(query, params);
+
+    res.json(students.map(s => ({
+      id: s.id,
+      lrn: s.lrn,
+      firstName: s.first_name,
+      middleName: s.middle_name,
+      lastName: s.last_name,
+      fullName: s.full_name,
+      age: s.age,
+      sex: s.sex,
+      gradeLevel: s.grade_level,
+      section: s.section,
+      contact: s.contact,
+      wmsuEmail: s.wmsu_email,
+      status: s.status,
+      attendance: s.attendance,
+      average: s.average,
+      profilePic: s.profile_pic,
+      qrCode: s.qr_code,
+      createdBy: s.created_by,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at
+    })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch students' });
+  }
+});
+
 module.exports = router;

@@ -41,12 +41,36 @@ export default function ClassList() {
 
   const fetchStudents = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/students');
-      const data = await response.json();
-      setStudents(data);
+      const token = localStorage.getItem('token');
+      // Get current user info from token if needed, or fetch from backend
+      // This endpoint should filter by teacher/adviser automatically
+      const response = await fetch('http://localhost:5000/api/student/my-students', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        // Fallback to all students if filtered endpoint not available
+        const response2 = await fetch('http://localhost:5000/api/students');
+        const data = await response2.json();
+        setStudents(Array.isArray(data) ? data : []);
+      } else {
+        const data = await response.json();
+        setStudents(Array.isArray(data) ? data : []);
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching students:', error);
+      // Fallback to all students
+      try {
+        const response = await fetch('http://localhost:5000/api/students');
+        const data = await response.json();
+        setStudents(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error('Fallback fetch also failed:', e);
+      }
       setLoading(false);
     }
   };
@@ -104,7 +128,7 @@ export default function ClassList() {
         profilePic: editFormData.profilePic  // Send updated photo
       };
 
-      const response = await fetch(`http://localhost:3001/api/students/${selectedStudent.id}`, {
+      const response = await fetch(`http://localhost:5000/api/students/${selectedStudent.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedData)
